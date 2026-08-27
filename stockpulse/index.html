@@ -1,0 +1,1961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockPulse</title>
+<meta name="description" content="A live-updating stock and ETF watchlist tracker — search any ticker, watch prices tick in real time, and compare 1D/1M/1Y/5Y/All-time performance at a glance.">
+<meta property="og:title" content="StockPulse">
+<meta property="og:description" content="A live-updating stock and ETF watchlist tracker — search any ticker, watch prices tick in real time, and compare performance across time ranges.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="StockPulse">
+<meta name="twitter:description" content="A live-updating stock and ETF watchlist tracker — search any ticker and track performance across time ranges.">
+<style>
+  :root {
+    --bg: #0b0e14;
+    --bg-elev: #121722;
+    --card: #151b28;
+    --card-hover: #1a2231;
+    --border: #232c3d;
+    --text: #e6e9ef;
+    --text-dim: #8891a3;
+    --text-faint: #545e72;
+    --accent: #4c8bff;
+    --accent-dim: #2a4a85;
+    --green: #26c281;
+    --green-bg: rgba(38, 194, 129, 0.12);
+    --red: #f0555a;
+    --red-bg: rgba(240, 85, 90, 0.12);
+    --radius: 10px;
+    --shadow: 0 4px 20px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(11, 14, 20, 0.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+  }
+
+  .header-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  .brand svg { flex-shrink: 0; }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    padding: 5px 10px 5px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 0 rgba(38,194,129,0.6);
+    animation: pulse 1.8s infinite;
+  }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(38,194,129,0.55); }
+    70% { box-shadow: 0 0 0 6px rgba(38,194,129,0); }
+    100% { box-shadow: 0 0 0 0 rgba(38,194,129,0); }
+  }
+
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+    max-width: 420px;
+  }
+
+  .search-input {
+    width: 100%;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px 10px 36px;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .search-input:focus { border-color: var(--accent); }
+
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-faint);
+    pointer-events: none;
+  }
+
+  .search-results {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    max-height: 340px;
+    overflow-y: auto;
+    display: none;
+    z-index: 30;
+  }
+
+  .search-results.open { display: block; }
+
+  .search-result-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-result-item:last-child { border-bottom: none; }
+  .search-result-item:hover, .search-result-item.active { background: var(--card-hover); }
+
+  .sr-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .sr-symbol { font-weight: 700; font-size: 13px; }
+  .sr-name { font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+  .sr-add {
+    font-size: 11px;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 3px 9px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    margin-left: 10px;
+  }
+  .sr-empty { padding: 16px; color: var(--text-faint); font-size: 13px; text-align: center; }
+  .sr-exchange { opacity: 0.75; }
+
+  .search-error {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: var(--red-bg);
+    border: 1px solid rgba(240, 85, 90, 0.35);
+    color: var(--red);
+    font-size: 12.5px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    z-index: 25;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition: opacity 0.15s, transform 0.15s;
+  }
+  .search-error.show { opacity: 1; transform: translateY(0); }
+
+  /* ---------- Main layout ---------- */
+  main {
+    flex: 1;
+    max-width: 1280px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px 24px 60px;
+  }
+
+  .summary-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+
+  .summary-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+
+  .summary-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+    margin-bottom: 6px;
+  }
+
+  .summary-value {
+    font-size: 20px;
+    font-weight: 700;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .summary-sub { font-size: 12px; color: var(--text-dim); font-weight: 500; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  .toolbar h2 {
+    font-size: 15px;
+    margin: 0;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+
+  .toolbar-controls { display: flex; gap: 8px; align-items: center; }
+
+  select#sortSelect {
+    background: var(--bg-elev);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 13px;
+    outline: none;
+  }
+
+  .view-toggle {
+    display: flex;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .view-toggle button {
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    padding: 7px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+  }
+  .view-toggle button.active { background: var(--accent-dim); color: var(--text); }
+
+  .range-toggle {
+    display: flex;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .range-toggle button {
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    padding: 7px 12px;
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .range-toggle button.active { background: var(--accent-dim); color: var(--text); }
+  .range-toggle.modal-range { margin: 14px 0 0; }
+  .range-toggle.modal-range button { padding: 6px 10px; font-size: 12px; }
+
+  /* ---------- Grid view ---------- */
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 12px;
+  }
+
+  .stock-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    cursor: pointer;
+    transition: transform 0.12s, border-color 0.12s, background 0.12s;
+    position: relative;
+  }
+
+  .stock-card:hover {
+    border-color: #33405a;
+    background: var(--card-hover);
+    transform: translateY(-1px);
+  }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+
+  .card-symbol { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+  .card-name {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-top: 2px;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .remove-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 5px;
+    opacity: 0.5;
+    transition: opacity 0.12s, color 0.12s, background 0.12s;
+  }
+  .stock-card:hover .remove-btn { opacity: 1; }
+  .remove-btn:hover { color: var(--red); background: var(--red-bg); opacity: 1; }
+
+  .card-price-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .card-price { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .card-change {
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .up { color: var(--green); }
+  .down { color: var(--red); }
+  .flat { color: var(--text-dim); }
+
+  .change-badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 7px;
+    border-radius: 6px;
+  }
+  .change-badge.up { background: var(--green-bg); }
+  .change-badge.down { background: var(--red-bg); }
+
+  canvas.sparkline {
+    width: 100%;
+    height: 44px;
+    display: block;
+  }
+
+  .loading-bar {
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--bg-elev) 25%, var(--border) 50%, var(--bg-elev) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .failed-card, .failed-row { opacity: 0.55; }
+  .failed-note { font-size: 12px; color: var(--text-faint); margin-top: 10px; }
+
+  .flash-up { animation: flashUp 0.5s ease; }
+  .flash-down { animation: flashDown 0.5s ease; }
+  @keyframes flashUp { 0% { background-color: rgba(38,194,129,0.18); } 100% { background-color: transparent; } }
+  @keyframes flashDown { 0% { background-color: rgba(240,85,90,0.18); } 100% { background-color: transparent; } }
+
+  /* ---------- List view ---------- */
+  #listWrap { display: none; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
+  table { width: 100%; min-width: 560px; border-collapse: collapse; table-layout: fixed; }
+  thead th:nth-child(1), tbody td:nth-child(1) { width: 12%; }
+  thead th:nth-child(2), tbody td:nth-child(2) { width: 27%; }
+  thead th:nth-child(3), tbody td:nth-child(3) { width: 14%; }
+  thead th:nth-child(4), tbody td:nth-child(4) { width: 14%; }
+  thead th:nth-child(5), tbody td:nth-child(5) { width: 14%; }
+  thead th:nth-child(6), tbody td:nth-child(6) { width: 14%; }
+  thead th:nth-child(7), tbody td:nth-child(7) { width: 5%; }
+  thead th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  thead th.num, tbody td.num { text-align: right; }
+  tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--card-hover); }
+  tbody td { padding: 12px; font-size: 13px; font-variant-numeric: tabular-nums; overflow: hidden; }
+  tbody td.sym { font-weight: 700; }
+  tbody td.name { color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  tbody td.spark canvas { width: 100%; height: 28px; display: block; }
+  tbody td.rm { text-align: right; padding-left: 4px; }
+
+  /* ---------- Empty state ---------- */
+  .empty-state {
+    text-align: center;
+    padding: 70px 20px;
+    color: var(--text-faint);
+  }
+  .empty-state h3 { color: var(--text-dim); font-size: 16px; margin-bottom: 6px; }
+  .empty-state p { font-size: 13px; max-width: 320px; margin: 0 auto; }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    max-width: 560px;
+    width: 100%;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+  .modal-title { font-size: 20px; font-weight: 700; }
+  .modal-sub { font-size: 13px; color: var(--text-faint); margin-top: 2px; }
+  .modal-close {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: 7px;
+    width: 30px; height: 30px;
+    cursor: pointer;
+    font-size: 15px;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  .modal-price-block { margin: 18px 0; }
+  .modal-price { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .modal-change { font-size: 15px; font-weight: 600; margin-top: 4px; }
+
+  canvas.big-chart { width: 100%; height: 160px; display: block; margin: 16px 0; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 6px;
+  }
+  .stat-box {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .stat-label { font-size: 10.5px; text-transform: uppercase; color: var(--text-faint); letter-spacing: 0.05em; margin-bottom: 4px; }
+  .stat-value { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  footer {
+    text-align: center;
+    padding: 18px;
+    font-size: 12px;
+    color: var(--text-faint);
+    border-top: 1px solid var(--border);
+  }
+  footer .badge {
+    display: inline-block;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 6px;
+    color: var(--text-dim);
+  }
+
+  @media (max-width: 640px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    header { padding: 12px 16px; }
+    main { padding: 16px 16px 40px; }
+  }
+
+  .app-hidden { display: none !important; }
+
+  /* ---------- Auth screen ---------- */
+  .auth-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .auth-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px 28px;
+    box-shadow: var(--shadow);
+  }
+  .auth-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 19px;
+    letter-spacing: -0.01em;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+  .auth-tabs {
+    display: flex;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 22px;
+  }
+  .auth-tabs button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    padding: 9px 0;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .auth-tabs button.active { background: var(--accent-dim); color: var(--text); }
+  .auth-field { margin-bottom: 14px; }
+  .auth-field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .auth-field input {
+    width: 100%;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .auth-field input:focus { border-color: var(--accent); }
+  .auth-error {
+    background: var(--red-bg);
+    border: 1px solid rgba(240, 85, 90, 0.35);
+    color: var(--red);
+    font-size: 12.5px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    display: none;
+  }
+  .auth-error.show { display: block; }
+  .auth-submit {
+    width: 100%;
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 11px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .auth-submit:hover { opacity: 0.9; }
+  .auth-submit:disabled { opacity: 0.6; cursor: default; }
+  .auth-note {
+    font-size: 11.5px;
+    color: var(--text-faint);
+    text-align: center;
+    margin: 18px 0 0;
+    line-height: 1.5;
+  }
+
+  .user-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    padding: 5px 6px 5px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .user-pill button {
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .user-pill button:hover { color: var(--red); background: var(--red-bg); }
+</style>
+</head>
+<body>
+
+<div id="authScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 17L9 11L13 15L21 6" stroke="#4c8bff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M15 6H21V12" stroke="#4c8bff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      StockPulse
+    </div>
+    <div class="auth-tabs">
+      <button type="button" id="tabSignIn" class="active">Sign In</button>
+      <button type="button" id="tabSignUp">Create Account</button>
+    </div>
+    <form id="authForm" novalidate>
+      <div class="auth-field">
+        <label for="authUsername">Username</label>
+        <input id="authUsername" type="text" autocomplete="username" maxlength="24">
+      </div>
+      <div class="auth-field">
+        <label for="authPassword">Password</label>
+        <input id="authPassword" type="password" autocomplete="current-password">
+      </div>
+      <div class="auth-field" id="authConfirmWrap" style="display:none;">
+        <label for="authConfirmPassword">Confirm password</label>
+        <input id="authConfirmPassword" type="password" autocomplete="new-password">
+      </div>
+      <div class="auth-error" id="authError"></div>
+      <button type="submit" class="auth-submit" id="authSubmit">Sign In</button>
+    </form>
+    <p class="auth-note">Accounts live only in this browser — there's no server, so nothing syncs across devices and this isn't real security. Each account gets its own private watchlist.</p>
+  </div>
+</div>
+
+<div id="appRoot" class="app-hidden">
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 17L9 11L13 15L21 6" stroke="#4c8bff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M15 6H21V12" stroke="#4c8bff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      StockPulse
+    </div>
+
+    <div class="search-wrap">
+      <span class="search-icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#545e72" stroke-width="2"/><path d="M21 21L16.65 16.65" stroke="#545e72" stroke-width="2" stroke-linecap="round"/></svg>
+      </span>
+      <input type="text" id="searchInput" class="search-input" placeholder="Search any stock or ETF ticker to add..." autocomplete="off">
+      <div id="searchResults" class="search-results"></div>
+    </div>
+
+    <div class="user-pill" id="userPill" style="display:none;">
+      <span id="userPillName"></span>
+      <button type="button" id="signOutBtn">Sign out</button>
+    </div>
+    <div class="status-pill"><span class="dot"></span> Live</div>
+  </div>
+</header>
+
+<main>
+  <div class="summary-row" id="summaryRow"></div>
+
+  <div class="toolbar">
+    <h2 id="watchlistCount">Watchlist</h2>
+    <div class="toolbar-controls">
+      <div class="range-toggle" id="rangeToggle">
+        <button data-range="1D" class="active">1D</button>
+        <button data-range="1M">1M</button>
+        <button data-range="1Y">1Y</button>
+        <button data-range="5Y">5Y</button>
+        <button data-range="ALL">All</button>
+      </div>
+      <select id="sortSelect">
+        <option value="default">Sort: Default</option>
+        <option value="name">Sort: Name (A–Z)</option>
+        <option value="price-desc">Sort: Price (High–Low)</option>
+        <option value="change-desc">Sort: % Change (Gainers first)</option>
+        <option value="change-asc">Sort: % Change (Losers first)</option>
+      </select>
+      <div class="view-toggle">
+        <button id="btnGrid" class="active" title="Grid view">▦</button>
+        <button id="btnList" title="List view">☰</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="grid"></div>
+
+  <div id="listWrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Name</th>
+          <th class="num">Price</th>
+          <th class="num">Change</th>
+          <th class="num">% Change</th>
+          <th>Trend</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="listBody"></tbody>
+    </table>
+  </div>
+
+  <div id="emptyState" class="empty-state" style="display:none;">
+    <h3>Your watchlist is empty</h3>
+    <p>Search any publicly traded stock or ETF above to start tracking it — not just the popular names.</p>
+  </div>
+</main>
+
+<footer>
+  Quotes, search, and price history are fetched live from Yahoo Finance via a public proxy when available. Price ticks between refreshes are simulated, and live data isn't guaranteed to stay available.
+  <span class="badge">Live + Simulated</span>
+</footer>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+</div><!-- /appRoot -->
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Stock universe
+  // ---------------------------------------------------------------
+  // base prices pulled live from Yahoo Finance on 2026-08-27 — real market prices, not estimates
+  const STOCK_DB = [
+    { symbol: "AAPL", name: "Apple Inc.", sector: "Technology", base: 310.39 },
+    { symbol: "MSFT", name: "Microsoft Corporation", sector: "Technology", base: 504.95 },
+    { symbol: "GOOGL", name: "Alphabet Inc.", sector: "Technology", base: 339.49 },
+    { symbol: "AMZN", name: "Amazon.com, Inc.", sector: "Consumer Discretionary", base: 257.26 },
+    { symbol: "NVDA", name: "NVIDIA Corporation", sector: "Technology", base: 224.57 },
+    { symbol: "TSLA", name: "Tesla, Inc.", sector: "Consumer Discretionary", base: 352.48 },
+    { symbol: "META", name: "Meta Platforms, Inc.", sector: "Technology", base: 579.61 },
+    { symbol: "NFLX", name: "Netflix, Inc.", sector: "Communication Services", base: 79.85 },
+    { symbol: "AMD", name: "Advanced Micro Devices, Inc.", sector: "Technology", base: 475.50 },
+    { symbol: "INTC", name: "Intel Corporation", sector: "Technology", base: 91.69 },
+    { symbol: "JPM", name: "JPMorgan Chase & Co.", sector: "Financials", base: 352.50 },
+    { symbol: "V", name: "Visa Inc.", sector: "Financials", base: 379.80 },
+    { symbol: "MA", name: "Mastercard Incorporated", sector: "Financials", base: 589.83 },
+    { symbol: "WMT", name: "Walmart Inc.", sector: "Consumer Staples", base: 102.60 },
+    { symbol: "DIS", name: "The Walt Disney Company", sector: "Communication Services", base: 108.07 },
+    { symbol: "KO", name: "The Coca-Cola Company", sector: "Consumer Staples", base: 89.41 },
+    { symbol: "PEP", name: "PepsiCo, Inc.", sector: "Consumer Staples", base: 140.06 },
+    { symbol: "NKE", name: "NIKE, Inc.", sector: "Consumer Discretionary", base: 38.62 },
+    { symbol: "BA", name: "The Boeing Company", sector: "Industrials", base: 210.08 },
+    { symbol: "XOM", name: "Exxon Mobil Corporation", sector: "Energy", base: 157.10 },
+    { symbol: "CVX", name: "Chevron Corporation", sector: "Energy", base: 198.73 },
+    { symbol: "JNJ", name: "Johnson & Johnson", sector: "Healthcare", base: 265.24 },
+    { symbol: "PFE", name: "Pfizer Inc.", sector: "Healthcare", base: 27.95 },
+    { symbol: "UNH", name: "UnitedHealth Group Incorporated", sector: "Healthcare", base: 396.70 },
+    { symbol: "HD", name: "The Home Depot, Inc.", sector: "Consumer Discretionary", base: 330.25 },
+    { symbol: "COST", name: "Costco Wholesale Corporation", sector: "Consumer Staples", base: 943.71 },
+    { symbol: "PYPL", name: "PayPal Holdings, Inc.", sector: "Technology", base: 61.92 },
+    { symbol: "ADBE", name: "Adobe Inc.", sector: "Technology", base: 286.07 },
+    { symbol: "CRM", name: "Salesforce, Inc.", sector: "Technology", base: 249.35 },
+    { symbol: "ORCL", name: "Oracle Corporation", sector: "Technology", base: 150.43 },
+    { symbol: "IBM", name: "International Business Machines", sector: "Technology", base: 237.01 },
+    { symbol: "CSCO", name: "Cisco Systems, Inc.", sector: "Technology", base: 112.21 },
+    { symbol: "QCOM", name: "QUALCOMM Incorporated", sector: "Technology", base: 164.43 },
+    { symbol: "UBER", name: "Uber Technologies, Inc.", sector: "Technology", base: 76.65 },
+    { symbol: "ABNB", name: "Airbnb, Inc.", sector: "Consumer Discretionary", base: 186.83 },
+    { symbol: "SBUX", name: "Starbucks Corporation", sector: "Consumer Discretionary", base: 108.07 },
+    { symbol: "MCD", name: "McDonald's Corporation", sector: "Consumer Discretionary", base: 263.22 },
+    { symbol: "GS", name: "The Goldman Sachs Group, Inc.", sector: "Financials", base: 1036.97 },
+    { symbol: "BAC", name: "Bank of America Corporation", sector: "Financials", base: 61.35 },
+    { symbol: "T", name: "AT&T Inc.", sector: "Communication Services", base: 25.49 },
+    { symbol: "VZ", name: "Verizon Communications Inc.", sector: "Communication Services", base: 49.64 },
+    { symbol: "SPY", name: "SPDR S&P 500 ETF Trust", sector: "ETF", base: 769.37 },
+    { symbol: "QQQ", name: "Invesco QQQ Trust", sector: "ETF", base: 718.32 },
+    { symbol: "PLTR", name: "Palantir Technologies Inc.", sector: "Technology", base: 184.40 },
+    { symbol: "SHOP", name: "Shopify Inc.", sector: "Technology", base: 154.22 },
+    { symbol: "XYZ", name: "Block, Inc.", sector: "Technology", base: 85.18 },
+    { symbol: "BABA", name: "Alibaba Group Holding Limited", sector: "Consumer Discretionary", base: 116.14 },
+    { symbol: "SOFI", name: "SoFi Technologies, Inc.", sector: "Financials", base: 19.18 },
+    { symbol: "RIVN", name: "Rivian Automotive, Inc.", sector: "Consumer Discretionary", base: 16.74 },
+    { symbol: "SNAP", name: "Snap Inc.", sector: "Communication Services", base: 5.46 },
+    { symbol: "F", name: "Ford Motor Company", sector: "Consumer Discretionary", base: 14.06 },
+    { symbol: "VOO", name: "Vanguard S&P 500 ETF", sector: "ETF", base: 708.33 },
+    { symbol: "VTI", name: "Vanguard Total Stock Market ETF", sector: "ETF", base: 380.37 },
+    { symbol: "VTSAX", name: "Vanguard Total Stock Mkt Idx Admiral", sector: "Mutual Fund", base: 184.08 },
+    { symbol: "VFIAX", name: "Vanguard 500 Index Admiral", sector: "Mutual Fund", base: 709.31 }
+  ];
+  const DB_BY_SYMBOL = Object.fromEntries(STOCK_DB.map(s => [s.symbol, s]));
+
+  const STORAGE_KEY_BASE = "stockpulse_watchlist_v1";
+  const META_STORAGE_KEY_BASE = "stockpulse_symbol_meta_v1";
+  const ACCOUNTS_KEY = "stockpulse_accounts_v1";
+  const SESSION_KEY = "stockpulse_session_v1";
+  let currentUsername = null;
+  function storageKey() { return STORAGE_KEY_BASE + "::" + currentUsername; }
+  function metaStorageKey() { return META_STORAGE_KEY_BASE + "::" + currentUsername; }
+  const HISTORY_LEN = 48;
+  const TICK_MS = 2200;
+  const RANGE_LABEL = { "1D": "1D", "1M": "1M", "1Y": "1Y", "5Y": "5Y", "ALL": "All-Time" };
+  const RANGE_PARAMS = {
+    "1M": { range: "1mo", interval: "1d" },
+    "1Y": { range: "1y", interval: "1wk" },
+    "5Y": { range: "5y", interval: "1wk" },
+    "ALL": { range: "max", interval: "1mo" }
+  };
+  const RANGE_CACHE_MS = 5 * 60 * 1000;
+  const RANGE_RETRY_COOLDOWN_MS = 60 * 1000;
+  const YF_CHART_BASE = "https://query1.finance.yahoo.com/v8/finance/chart/";
+  const YF_SEARCH_BASE = "https://query1.finance.yahoo.com/v1/finance/search?quotesCount=8&newsCount=0&q=";
+
+  // ---------------------------------------------------------------
+  // Live data access — real quotes/search/history fetched client-side
+  // through a public CORS proxy (Yahoo Finance blocks direct browser
+  // requests). Falls back between two proxies; callers handle failure.
+  // ---------------------------------------------------------------
+  function withTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))
+    ]);
+  }
+
+  async function proxyFetchJSON(targetUrl, timeoutMs = 8000) {
+    try {
+      const res = await withTimeout(fetch("https://corsproxy.io/?url=" + encodeURIComponent(targetUrl)), timeoutMs);
+      return await res.json();
+    } catch (e) {
+      try {
+        const res = await withTimeout(fetch("https://r.jina.ai/" + targetUrl), timeoutMs);
+        const text = await res.text();
+        const idx = text.indexOf("{");
+        if (idx < 0) throw new Error("Unparseable proxy response");
+        return JSON.parse(text.slice(idx));
+      } catch (e2) {
+        throw new Error("NETWORK_UNAVAILABLE");
+      }
+    }
+  }
+
+  async function fetchQuoteMeta(symbol) {
+    // range=1d is required for meta.chartPreviousClose to mean "yesterday's close" —
+    // with any longer range it instead means "close before the range window started"
+    const url = YF_CHART_BASE + encodeURIComponent(symbol) + "?range=1d&interval=5m";
+    const data = await proxyFetchJSON(url);
+    const result = data && data.chart && data.chart.result && data.chart.result[0];
+    const err = data && data.chart && data.chart.error;
+    if (err || !result || !result.meta || typeof result.meta.regularMarketPrice !== "number") {
+      throw new Error((err && err.description) || "Symbol not found");
+    }
+    return { meta: result.meta };
+  }
+
+  async function fetchRangeCloses(symbol, rangeKey) {
+    const p = RANGE_PARAMS[rangeKey];
+    const url = YF_CHART_BASE + encodeURIComponent(symbol) + `?range=${p.range}&interval=${p.interval}`;
+    const data = await proxyFetchJSON(url);
+    const result = data && data.chart && data.chart.result && data.chart.result[0];
+    const err = data && data.chart && data.chart.error;
+    if (err || !result) throw new Error((err && err.description) || "No historical data");
+    const closes = ((result.indicators && result.indicators.quote && result.indicators.quote[0] && result.indicators.quote[0].close) || [])
+      .filter(c => typeof c === "number");
+    if (!closes.length) throw new Error("No historical data");
+    return closes;
+  }
+
+  // ---------------------------------------------------------------
+  // Symbol metadata (name/sector/exchange) — from the curated list
+  // instantly, or from a live quote for anything else
+  // ---------------------------------------------------------------
+  let symbolMeta = {};
+  function loadSymbolMeta() {
+    try {
+      const raw = localStorage.getItem(metaStorageKey());
+      symbolMeta = raw ? (JSON.parse(raw) || {}) : {};
+    } catch (e) { symbolMeta = {}; }
+  }
+  function saveSymbolMeta() {
+    try { localStorage.setItem(metaStorageKey(), JSON.stringify(symbolMeta)); } catch (e) {}
+  }
+  function getMeta(symbol) {
+    if (symbolMeta[symbol]) return symbolMeta[symbol];
+    if (DB_BY_SYMBOL[symbol]) return { name: DB_BY_SYMBOL[symbol].name, sector: DB_BY_SYMBOL[symbol].sector };
+    return { name: symbol, sector: "Equity" };
+  }
+
+  // ---------------------------------------------------------------
+  // Price engine — real anchor data + a light simulated tick for
+  // between-refresh liveliness (no streaming feed on a static page)
+  // ---------------------------------------------------------------
+  function gaussianRandom() {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+
+  function downsample(arr, maxPoints) {
+    if (arr.length <= maxPoints) return arr.slice();
+    const result = [];
+    const stride = (arr.length - 1) / (maxPoints - 1);
+    for (let i = 0; i < maxPoints; i++) result.push(arr[Math.round(i * stride)]);
+    return result;
+  }
+
+  function seedIntradayHistory(prevClose) {
+    const history = [];
+    let p = prevClose * (1 - 0.006);
+    for (let i = 0; i < HISTORY_LEN; i++) {
+      p = p * (1 + gaussianRandom() * 0.0012);
+      history.push(+p.toFixed(2));
+    }
+    history[history.length - 1] = +prevClose.toFixed(2);
+    return history;
+  }
+
+  const priceState = {}; // symbol -> { price, prevClose, dayHigh, dayLow, history, volume, drift, loading, failed, rangeCache, rangeLoading }
+
+  function seedFromLocal(symbol) {
+    const dbEntry = DB_BY_SYMBOL[symbol];
+    if (!dbEntry) return false;
+    const prevClose = dbEntry.base;
+    const history = seedIntradayHistory(prevClose);
+    priceState[symbol] = {
+      price: prevClose,
+      prevClose,
+      dayHigh: Math.max(...history, prevClose),
+      dayLow: Math.min(...history, prevClose),
+      history,
+      volume: Math.floor(500000 + Math.random() * 4000000),
+      drift: (Math.random() - 0.5) * 0.0006,
+      lastDir: 0,
+      loading: false,
+      failed: false,
+      rangeCache: {},
+      rangeLoading: {}
+    };
+    return true;
+  }
+
+  function seedLoading(symbol) {
+    priceState[symbol] = {
+      price: null, prevClose: null, dayHigh: null, dayLow: null,
+      history: [], volume: 0, drift: 0, lastDir: 0,
+      loading: true, failed: false,
+      rangeCache: {}, rangeLoading: {}
+    };
+  }
+
+  function applyLiveMeta(symbol, meta) {
+    const prevClose = meta.chartPreviousClose != null ? meta.chartPreviousClose : (meta.previousClose != null ? meta.previousClose : meta.regularMarketPrice);
+    const price = meta.regularMarketPrice;
+    const existing = priceState[symbol];
+    const history = (existing && !existing.loading && existing.history && existing.history.length)
+      ? existing.history
+      : seedIntradayHistory(prevClose);
+    history[history.length - 1] = price;
+
+    priceState[symbol] = {
+      price,
+      prevClose,
+      dayHigh: meta.regularMarketDayHigh != null ? meta.regularMarketDayHigh : Math.max(price, prevClose),
+      dayLow: meta.regularMarketDayLow != null ? meta.regularMarketDayLow : Math.min(price, prevClose),
+      history,
+      volume: meta.regularMarketVolume != null ? meta.regularMarketVolume : ((existing && existing.volume) || 0),
+      drift: existing ? existing.drift : (Math.random() - 0.5) * 0.0006,
+      lastDir: 0,
+      loading: false,
+      failed: false,
+      fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh,
+      fiftyTwoWeekLow: meta.fiftyTwoWeekLow,
+      rangeCache: (existing && existing.rangeCache) || {},
+      rangeLoading: (existing && existing.rangeLoading) || {}
+    };
+
+    symbolMeta[symbol] = {
+      name: meta.longName || meta.shortName || symbol,
+      sector: meta.instrumentType === "ETF" ? "ETF" : (meta.fullExchangeName || meta.exchangeName || "Equity")
+    };
+    saveSymbolMeta();
+  }
+
+  // returns { series, startPrice, loading } for a time range, ending at the live current price
+  function getRangeSeries(symbol, rangeKey) {
+    const st = priceState[symbol];
+    if (!st || st.loading) return { series: [], startPrice: 0, loading: true };
+
+    if (rangeKey === "1D") {
+      return { series: st.history, startPrice: st.prevClose, loading: false };
+    }
+
+    const cached = st.rangeCache[rangeKey];
+    const fresh = cached && cached.closes && (Date.now() - cached.fetchedAt < RANGE_CACHE_MS);
+    if (!fresh) ensureRangeFetch(symbol, rangeKey);
+
+    if (cached && cached.closes) {
+      const series = downsample(cached.closes.concat([st.price]), 90);
+      return { series, startPrice: cached.closes[0], loading: false };
+    }
+    return { series: [st.price, st.price], startPrice: st.price, loading: true };
+  }
+
+  function ensureRangeFetch(symbol, rangeKey) {
+    const st = priceState[symbol];
+    if (!st || st.rangeLoading[rangeKey]) return;
+    const cached = st.rangeCache[rangeKey];
+    if (cached && cached.failedAt && (Date.now() - cached.failedAt < RANGE_RETRY_COOLDOWN_MS)) return;
+    st.rangeLoading[rangeKey] = true;
+    fetchRangeCloses(symbol, rangeKey)
+      .then(closes => {
+        const cur = priceState[symbol];
+        if (cur) cur.rangeCache[rangeKey] = { closes, fetchedAt: Date.now() };
+      })
+      .catch(() => {
+        const cur = priceState[symbol];
+        if (cur) cur.rangeCache[rangeKey] = { closes: null, failedAt: Date.now() };
+      })
+      .finally(() => {
+        const cur = priceState[symbol];
+        if (cur) cur.rangeLoading[rangeKey] = false;
+        renderAll();
+        if (modalOverlay.classList.contains("open") && modalOverlay.dataset.symbol === symbol) {
+          renderModalBody(symbol);
+        }
+      });
+  }
+
+  function tickSymbol(symbol) {
+    const st = priceState[symbol];
+    if (!st || st.loading || st.failed) return;
+    // drift slowly random-walks to create short trends/momentum
+    st.drift += gaussianRandom() * 0.00025;
+    st.drift = Math.max(-0.0025, Math.min(0.0025, st.drift));
+
+    const noise = gaussianRandom() * 0.0022;
+    const pctChange = st.drift + noise;
+    const newPrice = Math.max(0.01, st.price * (1 + pctChange));
+
+    st.lastDir = newPrice > st.price ? 1 : (newPrice < st.price ? -1 : 0);
+    st.price = +newPrice.toFixed(2);
+    st.dayHigh = Math.max(st.dayHigh, st.price);
+    st.dayLow = Math.min(st.dayLow, st.price);
+    st.volume += Math.floor(Math.random() * 15000);
+
+    st.history.push(st.price);
+    if (st.history.length > HISTORY_LEN) st.history.shift();
+  }
+
+  // ---------------------------------------------------------------
+  // Watchlist persistence
+  // ---------------------------------------------------------------
+  function loadWatchlist() {
+    try {
+      const raw = localStorage.getItem(storageKey());
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length) {
+          return arr.map(s => String(s).toUpperCase()).filter(s => /^[A-Z0-9.\-^=]{1,15}$/.test(s));
+        }
+        if (Array.isArray(arr)) return []; // deliberately emptied watchlist
+      }
+    } catch (e) {}
+    return ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA", "AMZN"];
+  }
+
+  function saveWatchlist() {
+    try { localStorage.setItem(storageKey(), JSON.stringify(watchlist)); } catch (e) {}
+  }
+
+  let watchlist = [];
+  let tickIntervalId = null;
+
+  // called once per successful sign-in — loads this account's own watchlist
+  // and starts the live tick loop
+  function startApp() {
+    loadSymbolMeta();
+    watchlist = loadWatchlist();
+    watchlist.forEach(sym => {
+      if (DB_BY_SYMBOL[sym]) seedFromLocal(sym); else seedLoading(sym);
+    });
+    // refresh every watchlist symbol with a live quote in the background (keeps
+    // curated starting prices current too, and hydrates any custom-added ones)
+    watchlist.forEach(sym => {
+      fetchQuoteMeta(sym)
+        .then(({ meta }) => {
+          applyLiveMeta(sym, meta);
+          renderAll();
+        })
+        .catch(() => {
+          const st = priceState[sym];
+          if (st && st.loading) {
+            st.loading = false;
+            st.failed = true;
+            renderAll();
+          }
+        });
+    });
+    renderAll();
+    if (tickIntervalId) clearInterval(tickIntervalId);
+    tickIntervalId = setInterval(tick, TICK_MS);
+  }
+
+  // ---------------------------------------------------------------
+  // DOM refs
+  // ---------------------------------------------------------------
+  const grid = document.getElementById("grid");
+  const listWrap = document.getElementById("listWrap");
+  const listBody = document.getElementById("listBody");
+  const emptyState = document.getElementById("emptyState");
+  const summaryRow = document.getElementById("summaryRow");
+  const watchlistCount = document.getElementById("watchlistCount");
+  const searchInput = document.getElementById("searchInput");
+  const searchResults = document.getElementById("searchResults");
+  const sortSelect = document.getElementById("sortSelect");
+  const btnGrid = document.getElementById("btnGrid");
+  const btnList = document.getElementById("btnList");
+  const modalOverlay = document.getElementById("modalOverlay");
+  const modalContent = document.getElementById("modalContent");
+  const rangeToggle = document.getElementById("rangeToggle");
+
+  let viewMode = "grid";
+  let currentRange = "1D";
+  let flashSet = {}; // symbol -> 'up'|'down' for one render cycle
+
+  // ---------------------------------------------------------------
+  // Authentication — local-only accounts (hashed + salted, stored in
+  // this browser's localStorage). No server: not real security, just
+  // an access gate + a way to keep each person's watchlist separate.
+  // ---------------------------------------------------------------
+  const authScreen = document.getElementById("authScreen");
+  const appRoot = document.getElementById("appRoot");
+  const authForm = document.getElementById("authForm");
+  const authUsernameInput = document.getElementById("authUsername");
+  const authPasswordInput = document.getElementById("authPassword");
+  const authConfirmWrap = document.getElementById("authConfirmWrap");
+  const authConfirmPasswordInput = document.getElementById("authConfirmPassword");
+  const authErrorEl = document.getElementById("authError");
+  const authSubmit = document.getElementById("authSubmit");
+  const tabSignIn = document.getElementById("tabSignIn");
+  const tabSignUp = document.getElementById("tabSignUp");
+  const userPill = document.getElementById("userPill");
+  const userPillName = document.getElementById("userPillName");
+  const signOutBtn = document.getElementById("signOutBtn");
+
+  let authMode = "signin";
+
+  async function sha256Hex(str) {
+    if (!window.crypto || !window.crypto.subtle) {
+      throw new Error("This browser tab isn't in a secure context, so password hashing isn't available here. Open this page directly (not embedded) over https:// or as a local file.");
+    }
+    const enc = new TextEncoder().encode(str);
+    const buf = await crypto.subtle.digest("SHA-256", enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+  function randomSaltHex() {
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+  function loadAccounts() {
+    try { return JSON.parse(localStorage.getItem(ACCOUNTS_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function saveAccounts(accounts) {
+    try { localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts)); } catch (e) {}
+  }
+  async function createAccount(username, password) {
+    const accounts = loadAccounts();
+    const key = username.toLowerCase();
+    if (accounts[key]) throw new Error("That username is already taken.");
+    const salt = randomSaltHex();
+    const hash = await sha256Hex(salt + ":" + password);
+    accounts[key] = { username, salt, hash };
+    saveAccounts(accounts);
+  }
+  async function verifyAccount(username, password) {
+    const accounts = loadAccounts();
+    const account = accounts[username.toLowerCase()];
+    if (!account) throw new Error("No account found with that username.");
+    const hash = await sha256Hex(account.salt + ":" + password);
+    if (hash !== account.hash) throw new Error("Incorrect password.");
+    return account.username;
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    tabSignIn.classList.toggle("active", mode === "signin");
+    tabSignUp.classList.toggle("active", mode === "signup");
+    authConfirmWrap.style.display = mode === "signup" ? "block" : "none";
+    authSubmit.textContent = mode === "signup" ? "Create Account" : "Sign In";
+    authPasswordInput.autocomplete = mode === "signup" ? "new-password" : "current-password";
+    authErrorEl.classList.remove("show");
+    authErrorEl.textContent = "";
+  }
+  tabSignIn.addEventListener("click", () => setAuthMode("signin"));
+  tabSignUp.addEventListener("click", () => setAuthMode("signup"));
+
+  function showAuthError(msg) {
+    authErrorEl.textContent = msg;
+    authErrorEl.classList.add("show");
+  }
+
+  authForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const username = authUsernameInput.value.trim();
+    const password = authPasswordInput.value;
+    authErrorEl.classList.remove("show");
+
+    if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) {
+      showAuthError("Username must be 3–24 characters: letters, numbers, or underscore.");
+      return;
+    }
+    if (password.length < 6) {
+      showAuthError("Password must be at least 6 characters.");
+      return;
+    }
+
+    authSubmit.disabled = true;
+    try {
+      if (authMode === "signup") {
+        if (password !== authConfirmPasswordInput.value) {
+          showAuthError("Passwords don't match.");
+          return;
+        }
+        await createAccount(username, password);
+        enterApp(username);
+      } else {
+        const realUsername = await verifyAccount(username, password);
+        enterApp(realUsername);
+      }
+    } catch (err) {
+      showAuthError((err && err.message) || "Something went wrong. Try again.");
+    } finally {
+      authSubmit.disabled = false;
+    }
+  });
+
+  function enterApp(username) {
+    currentUsername = username;
+    try { localStorage.setItem(SESSION_KEY, username); } catch (e) {}
+    authScreen.classList.add("app-hidden");
+    appRoot.classList.remove("app-hidden");
+    userPill.style.display = "flex";
+    userPillName.textContent = username;
+    authForm.reset();
+    startApp();
+  }
+
+  function signOut() {
+    if (tickIntervalId) { clearInterval(tickIntervalId); tickIntervalId = null; }
+    try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+    currentUsername = null;
+    watchlist = [];
+    Object.keys(priceState).forEach(k => delete priceState[k]);
+    symbolMeta = {};
+    closeModal();
+    appRoot.classList.add("app-hidden");
+    authScreen.classList.remove("app-hidden");
+    userPill.style.display = "none";
+    setAuthMode("signin");
+    authUsernameInput.value = "";
+    authPasswordInput.value = "";
+    authConfirmPasswordInput.value = "";
+  }
+  signOutBtn.addEventListener("click", signOut);
+
+  function checkExistingSession() {
+    let username = null;
+    try { username = localStorage.getItem(SESSION_KEY); } catch (e) {}
+    if (!username) return;
+    const accounts = loadAccounts();
+    if (accounts[username.toLowerCase()]) enterApp(username);
+  }
+
+  rangeToggle.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-range]");
+    if (!btn) return;
+    currentRange = btn.dataset.range;
+    [...rangeToggle.querySelectorAll("button")].forEach(b => b.classList.toggle("active", b === btn));
+    renderAll();
+  });
+
+  // ---------------------------------------------------------------
+  // Search — instant local matches + live global search (any ticker)
+  // ---------------------------------------------------------------
+  let searchToken = 0;
+  let searchDebounceTimer = null;
+  let searchErrorTimer = null;
+
+  function localMatches(qLower) {
+    return STOCK_DB.filter(s =>
+      !watchlist.includes(s.symbol) &&
+      (s.symbol.toLowerCase().includes(qLower) || s.name.toLowerCase().includes(qLower))
+    ).slice(0, 8);
+  }
+
+  function searchRowHtml(symbol, name, sub) {
+    return `
+      <div class="search-result-item" data-symbol="${escapeHtml(symbol)}">
+        <div class="sr-left">
+          <span class="sr-symbol">${escapeHtml(symbol)}</span>
+          <span class="sr-name">${escapeHtml(name)}${sub ? ` <span class="sr-exchange">&middot; ${escapeHtml(sub)}</span>` : ""}</span>
+        </div>
+        <span class="sr-add">+ Add</span>
+      </div>
+    `;
+  }
+
+  function manualAddRowHtml(query) {
+    const sym = query.trim().toUpperCase();
+    return `
+      <div class="search-result-item" data-symbol="${escapeHtml(sym)}">
+        <div class="sr-left">
+          <span class="sr-symbol">${escapeHtml(sym)}</span>
+          <span class="sr-name">Add this ticker directly</span>
+        </div>
+        <span class="sr-add">+ Add</span>
+      </div>
+    `;
+  }
+
+  function renderSearchResults(query) {
+    const q = query.trim();
+    const qLower = q.toLowerCase();
+    if (!qLower) { searchResults.classList.remove("open"); searchResults.innerHTML = ""; return; }
+
+    const local = localMatches(qLower);
+    searchResults.innerHTML = local.length
+      ? local.map(s => searchRowHtml(s.symbol, s.name)).join("")
+      : '<div class="sr-empty">Searching the market…</div>';
+    searchResults.classList.add("open");
+
+    const token = ++searchToken;
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => runLiveSearch(q, token), 300);
+  }
+
+  async function runLiveSearch(query, token) {
+    try {
+      const data = await proxyFetchJSON(YF_SEARCH_BASE + encodeURIComponent(query), 6000);
+      if (token !== searchToken) return;
+      const quotes = (data.quotes || [])
+        .filter(x => (x.quoteType === "EQUITY" || x.quoteType === "ETF") && x.symbol)
+        .filter(x => !watchlist.includes(x.symbol))
+        .slice(0, 8);
+
+      if (!quotes.length) {
+        searchResults.innerHTML = '<div class="sr-empty">No matches found</div>' + manualAddRowHtml(query);
+        return;
+      }
+      searchResults.innerHTML = quotes.map(x =>
+        searchRowHtml(x.symbol, x.longname || x.shortname || x.symbol, x.exchange)
+      ).join("");
+    } catch (e) {
+      if (token !== searchToken) return;
+      if (!localMatches(query.trim().toLowerCase()).length) {
+        searchResults.innerHTML = '<div class="sr-empty">Live search unavailable right now</div>' + manualAddRowHtml(query);
+      }
+    }
+  }
+
+  searchInput.addEventListener("input", () => renderSearchResults(searchInput.value));
+  searchInput.addEventListener("focus", () => { if (searchInput.value.trim()) renderSearchResults(searchInput.value); });
+  searchInput.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const first = searchResults.querySelector(".search-result-item");
+    if (first) { first.click(); return; }
+    const raw = searchInput.value.trim();
+    if (raw) { addStock(raw); searchInput.value = ""; searchResults.classList.remove("open"); searchResults.innerHTML = ""; }
+  });
+
+  searchResults.addEventListener("click", (e) => {
+    const item = e.target.closest(".search-result-item");
+    if (!item) return;
+    const symbol = item.dataset.symbol;
+    if (!symbol) return;
+    searchToken++; // invalidate any in-flight live search response
+    addStock(symbol);
+    searchInput.value = "";
+    searchResults.classList.remove("open");
+    searchResults.innerHTML = "";
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".search-wrap")) {
+      searchResults.classList.remove("open");
+    }
+  });
+
+  function showSearchError(msg) {
+    let el = document.getElementById("searchError");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "searchError";
+      el.className = "search-error";
+      document.querySelector(".search-wrap").appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(searchErrorTimer);
+    searchErrorTimer = setTimeout(() => el.classList.remove("show"), 4500);
+  }
+
+  function addStock(rawSymbol) {
+    const symbol = rawSymbol.trim().toUpperCase();
+    if (!symbol || watchlist.includes(symbol)) return;
+    if (!/^[A-Z0-9.\-^=]{1,15}$/.test(symbol)) {
+      showSearchError(`"${rawSymbol}" doesn't look like a valid ticker.`);
+      return;
+    }
+
+    const hasLocal = !!DB_BY_SYMBOL[symbol];
+    if (hasLocal) seedFromLocal(symbol); else seedLoading(symbol);
+    watchlist.push(symbol);
+    saveWatchlist();
+    renderAll();
+
+    fetchQuoteMeta(symbol)
+      .then(({ meta }) => {
+        applyLiveMeta(symbol, meta);
+        renderAll();
+        if (modalOverlay.classList.contains("open") && modalOverlay.dataset.symbol === symbol) {
+          renderModalBody(symbol);
+        }
+      })
+      .catch((err) => {
+        if (hasLocal) {
+          // keep the curated seed data — just couldn't refresh it live right now
+          const st = priceState[symbol];
+          if (st) st.loading = false;
+          renderAll();
+          return;
+        }
+        // couldn't verify a genuinely custom symbol — roll back the optimistic add
+        watchlist = watchlist.filter(s => s !== symbol);
+        delete priceState[symbol];
+        saveWatchlist();
+        renderAll();
+        if (err && err.message === "NETWORK_UNAVAILABLE") {
+          const embedded = window.self !== window.top;
+          showSearchError(embedded
+            ? `"${symbol}" isn't in the built-in list, and live lookups don't work in this embedded view. Open the full page directly (not embedded) to add any ticker.`
+            : `Live data isn't reachable right now, so "${symbol}" can't be verified. Check your connection and try again.`);
+        } else {
+          showSearchError(`Couldn't find "${symbol}". Check the ticker and try again.`);
+        }
+      });
+  }
+
+  function removeStock(symbol) {
+    watchlist = watchlist.filter(s => s !== symbol);
+    delete priceState[symbol];
+    saveWatchlist();
+    renderAll();
+  }
+
+  // ---------------------------------------------------------------
+  // Sorting
+  // ---------------------------------------------------------------
+  function getSortedWatchlist() {
+    const mode = sortSelect.value;
+    const list = [...watchlist];
+    const pctChange = (sym) => {
+      const st = priceState[sym];
+      if (!st || st.loading || st.failed) return 0;
+      const { startPrice, loading } = getRangeSeries(sym, currentRange);
+      if (loading) return 0;
+      return ((st.price - startPrice) / startPrice) * 100;
+    };
+    if (mode === "name") {
+      list.sort((a, b) => a.localeCompare(b));
+    } else if (mode === "price-desc") {
+      list.sort((a, b) => ((priceState[b] && priceState[b].price) || 0) - ((priceState[a] && priceState[a].price) || 0));
+    } else if (mode === "change-desc") {
+      list.sort((a, b) => pctChange(b) - pctChange(a));
+    } else if (mode === "change-asc") {
+      list.sort((a, b) => pctChange(a) - pctChange(b));
+    }
+    return list;
+  }
+
+  sortSelect.addEventListener("change", renderAll);
+
+  // ---------------------------------------------------------------
+  // View toggle
+  // ---------------------------------------------------------------
+  btnGrid.addEventListener("click", () => { viewMode = "grid"; btnGrid.classList.add("active"); btnList.classList.remove("active"); renderAll(); });
+  btnList.addEventListener("click", () => { viewMode = "list"; btnList.classList.add("active"); btnGrid.classList.remove("active"); renderAll(); });
+
+  // ---------------------------------------------------------------
+  // Sparkline drawing
+  // ---------------------------------------------------------------
+  function drawSparkline(canvas, history, isUp) {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(rect.width, 40);
+    const h = Math.max(rect.height, 20);
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    if (history.length < 2) return;
+    const min = Math.min(...history);
+    const max = Math.max(...history);
+    const range = (max - min) || 1;
+    const stepX = w / (history.length - 1);
+    const color = isUp ? "#26c281" : "#f0555a";
+
+    ctx.beginPath();
+    history.forEach((v, i) => {
+      const x = i * stepX;
+      const y = h - ((v - min) / range) * (h - 4) - 2;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.6;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    // gradient fill under line
+    const lastX = (history.length - 1) * stepX;
+    ctx.lineTo(lastX, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, isUp ? "rgba(38,194,129,0.25)" : "rgba(240,85,90,0.25)");
+    grad.addColorStop(1, isUp ? "rgba(38,194,129,0)" : "rgba(240,85,90,0)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  // ---------------------------------------------------------------
+  // Rendering
+  // ---------------------------------------------------------------
+  function fmtPrice(v) { return "$" + v.toFixed(2); }
+  function fmtChange(v) { return (v >= 0 ? "+" : "") + v.toFixed(2); }
+  function fmtPct(v) { return (v >= 0 ? "+" : "") + v.toFixed(2) + "%"; }
+  function fmtVolume(v) {
+    if (v >= 1e9) return (v / 1e9).toFixed(2) + "B";
+    if (v >= 1e6) return (v / 1e6).toFixed(2) + "M";
+    if (v >= 1e3) return (v / 1e3).toFixed(1) + "K";
+    return String(v);
+  }
+  function escapeHtml(str) {
+    return str.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function renderSummary() {
+    if (!watchlist.length) { summaryRow.innerHTML = ""; return; }
+    let gainers = 0, losers = 0, topGainer = null, topLoser = null;
+    watchlist.forEach(sym => {
+      const st = priceState[sym];
+      if (!st || st.loading || st.failed) return;
+      const { startPrice, loading } = getRangeSeries(sym, currentRange);
+      if (loading) return;
+      const pct = ((st.price - startPrice) / startPrice) * 100;
+      if (pct > 0) gainers++;
+      if (pct < 0) losers++;
+      if (!topGainer || pct > topGainer.pct) topGainer = { sym, pct };
+      if (!topLoser || pct < topLoser.pct) topLoser = { sym, pct };
+    });
+    const rl = RANGE_LABEL[currentRange];
+
+    summaryRow.innerHTML = `
+      <div class="summary-card">
+        <div class="summary-label">Tracking</div>
+        <div class="summary-value">${watchlist.length} <span class="summary-sub">stocks</span></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Gainers / Losers &middot; ${rl}</div>
+        <div class="summary-value"><span class="up">${gainers}</span> <span class="summary-sub">/</span> <span class="down">${losers}</span></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Top Gainer &middot; ${rl}</div>
+        <div class="summary-value up">${topGainer ? topGainer.sym : "—"} <span class="summary-sub up">${topGainer ? fmtPct(topGainer.pct) : ""}</span></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Top Loser &middot; ${rl}</div>
+        <div class="summary-value down">${topLoser ? topLoser.sym : "—"} <span class="summary-sub down">${topLoser ? fmtPct(topLoser.pct) : ""}</span></div>
+      </div>
+    `;
+  }
+
+  function renderGrid(order) {
+    grid.innerHTML = order.map(sym => {
+      const st = priceState[sym];
+      const flash = flashSet[sym] ? ("flash-" + flashSet[sym]) : "";
+
+      if (!st || st.loading) {
+        return `
+          <div class="stock-card" data-symbol="${sym}">
+            <div class="card-top">
+              <div>
+                <div class="card-symbol">${sym}</div>
+                <div class="card-name">Fetching live data…</div>
+              </div>
+              <button class="remove-btn" data-remove="${sym}" title="Remove from watchlist">&times;</button>
+            </div>
+            <div class="loading-bar" style="width:70%; height:22px; margin-top:6px;"></div>
+            <div class="loading-bar" style="width:100%; height:44px; margin-top:10px;"></div>
+          </div>
+        `;
+      }
+      if (st.failed) {
+        return `
+          <div class="stock-card failed-card" data-symbol="${sym}">
+            <div class="card-top">
+              <div>
+                <div class="card-symbol">${sym}</div>
+                <div class="card-name">Live data unavailable</div>
+              </div>
+              <button class="remove-btn" data-remove="${sym}" title="Remove from watchlist">&times;</button>
+            </div>
+            <div class="failed-note">Couldn't reach market data for this symbol.</div>
+          </div>
+        `;
+      }
+
+      const meta = getMeta(sym);
+      const { startPrice } = getRangeSeries(sym, currentRange);
+      const change = st.price - startPrice;
+      const pct = (change / startPrice) * 100;
+      const dirClass = change > 0 ? "up" : change < 0 ? "down" : "flat";
+      return `
+        <div class="stock-card ${flash}" data-symbol="${sym}">
+          <div class="card-top">
+            <div>
+              <div class="card-symbol">${sym}</div>
+              <div class="card-name">${escapeHtml(meta.name)}</div>
+            </div>
+            <button class="remove-btn" data-remove="${sym}" title="Remove from watchlist">&times;</button>
+          </div>
+          <div class="card-price-row">
+            <div class="card-price">${fmtPrice(st.price)}</div>
+            <div class="change-badge ${dirClass}">${fmtPct(pct)}</div>
+          </div>
+          <canvas class="sparkline" data-spark="${sym}"></canvas>
+        </div>
+      `;
+    }).join("");
+
+    order.forEach(sym => {
+      const st = priceState[sym];
+      if (!st || st.loading || st.failed) return;
+      const canvas = grid.querySelector(`canvas[data-spark="${sym}"]`);
+      const { series, startPrice } = getRangeSeries(sym, currentRange);
+      if (canvas) drawSparkline(canvas, series, st.price >= startPrice);
+    });
+  }
+
+  function renderList(order) {
+    listBody.innerHTML = order.map(sym => {
+      const st = priceState[sym];
+
+      if (!st || st.loading) {
+        return `
+          <tr data-symbol="${sym}">
+            <td class="sym">${sym}</td>
+            <td class="name">Fetching live data…</td>
+            <td class="num">—</td>
+            <td class="num">—</td>
+            <td class="num">—</td>
+            <td class="spark"></td>
+            <td class="rm"><button class="remove-btn" data-remove="${sym}" title="Remove from watchlist">&times;</button></td>
+          </tr>
+        `;
+      }
+      if (st.failed) {
+        return `
+          <tr data-symbol="${sym}" class="failed-row">
+            <td class="sym">${sym}</td>
+            <td class="name">Live data unavailable</td>
+            <td class="num">—</td>
+            <td class="num">—</td>
+            <td class="num">—</td>
+            <td class="spark"></td>
+            <td class="rm"><button class="remove-btn" data-remove="${sym}" title="Remove from watchlist">&times;</button></td>
+          </tr>
+        `;
+      }
+
+      const meta = getMeta(sym);
+      const { startPrice } = getRangeSeries(sym, currentRange);
+      const change = st.price - startPrice;
+      const pct = (change / startPrice) * 100;
+      const dirClass = change > 0 ? "up" : change < 0 ? "down" : "flat";
+      return `
+        <tr data-symbol="${sym}">
+          <td class="sym">${sym}</td>
+          <td class="name">${escapeHtml(meta.name)}</td>
+          <td class="num">${fmtPrice(st.price)}</td>
+          <td class="num ${dirClass}">${fmtChange(change)}</td>
+          <td class="num ${dirClass}">${fmtPct(pct)}</td>
+          <td class="spark"><canvas data-spark-list="${sym}"></canvas></td>
+          <td class="rm"><button class="remove-btn" data-remove="${sym}" title="Remove from watchlist">&times;</button></td>
+        </tr>
+      `;
+    }).join("");
+
+    order.forEach(sym => {
+      const st = priceState[sym];
+      if (!st || st.loading || st.failed) return;
+      const canvas = listBody.querySelector(`canvas[data-spark-list="${sym}"]`);
+      const { series, startPrice } = getRangeSeries(sym, currentRange);
+      if (canvas) drawSparkline(canvas, series, st.price >= startPrice);
+    });
+  }
+
+  function renderAll() {
+    watchlistCount.textContent = `Watchlist (${watchlist.length})`;
+    renderSummary();
+
+    if (!watchlist.length) {
+      grid.style.display = "none";
+      listWrap.style.display = "none";
+      emptyState.style.display = "block";
+      flashSet = {};
+      return;
+    }
+    emptyState.style.display = "none";
+
+    const order = getSortedWatchlist();
+
+    if (viewMode === "grid") {
+      grid.style.display = "grid";
+      listWrap.style.display = "none";
+      renderGrid(order);
+    } else {
+      grid.style.display = "none";
+      listWrap.style.display = "block";
+      renderList(order);
+    }
+    flashSet = {};
+  }
+
+  grid.addEventListener("click", (e) => {
+    const rm = e.target.closest("[data-remove]");
+    if (rm) { e.stopPropagation(); removeStock(rm.dataset.remove); return; }
+    const card = e.target.closest(".stock-card");
+    if (card) openModal(card.dataset.symbol);
+  });
+
+  listBody.addEventListener("click", (e) => {
+    const rm = e.target.closest("[data-remove]");
+    if (rm) { e.stopPropagation(); removeStock(rm.dataset.remove); return; }
+    const row = e.target.closest("tr[data-symbol]");
+    if (row) openModal(row.dataset.symbol);
+  });
+
+  // ---------------------------------------------------------------
+  // Modal detail view
+  // ---------------------------------------------------------------
+  let modalRange = "1D";
+
+  function openModal(symbol) {
+    modalRange = currentRange;
+    modalOverlay.classList.add("open");
+    modalOverlay.dataset.symbol = symbol;
+    renderModalBody(symbol);
+  }
+
+  function renderModalBody(symbol) {
+    const st = priceState[symbol];
+    if (!st) { closeModal(); return; }
+
+    if (st.loading) {
+      modalContent.innerHTML = `
+        <div class="modal-header">
+          <div>
+            <div class="modal-title">${symbol}</div>
+            <div class="modal-sub">Fetching live data…</div>
+          </div>
+          <button class="modal-close" id="modalClose">&times;</button>
+        </div>
+        <div class="loading-bar" style="height:32px; width:50%; margin-top:20px;"></div>
+        <div class="loading-bar" style="height:160px; width:100%; margin-top:16px;"></div>
+      `;
+      document.getElementById("modalClose").addEventListener("click", closeModal);
+      return;
+    }
+    if (st.failed) {
+      modalContent.innerHTML = `
+        <div class="modal-header">
+          <div>
+            <div class="modal-title">${symbol}</div>
+            <div class="modal-sub">Live data unavailable</div>
+          </div>
+          <button class="modal-close" id="modalClose">&times;</button>
+        </div>
+        <p class="failed-note">Couldn't reach live market data for this symbol. Remove it and try again later.</p>
+      `;
+      document.getElementById("modalClose").addEventListener("click", closeModal);
+      return;
+    }
+
+    const meta = getMeta(symbol);
+    const { series, startPrice, loading: rangeLoading } = getRangeSeries(symbol, modalRange);
+    const change = st.price - startPrice;
+    const pct = (change / startPrice) * 100;
+    const dirClass = change > 0 ? "up" : change < 0 ? "down" : "flat";
+    const isIntraday = modalRange === "1D";
+    const fiftyTwoRange = (st.fiftyTwoWeekHigh != null && st.fiftyTwoWeekLow != null)
+      ? `${fmtPrice(st.fiftyTwoWeekLow)} – ${fmtPrice(st.fiftyTwoWeekHigh)}`
+      : "—";
+
+    const statsHtml = isIntraday ? `
+      <div class="stat-box"><div class="stat-label">Prev Close</div><div class="stat-value">${fmtPrice(st.prevClose)}</div></div>
+      <div class="stat-box"><div class="stat-label">Day High</div><div class="stat-value">${fmtPrice(st.dayHigh)}</div></div>
+      <div class="stat-box"><div class="stat-label">Day Low</div><div class="stat-value">${fmtPrice(st.dayLow)}</div></div>
+      <div class="stat-box"><div class="stat-label">Volume</div><div class="stat-value">${fmtVolume(st.volume)}</div></div>
+      <div class="stat-box"><div class="stat-label">52-Week Range</div><div class="stat-value">${fiftyTwoRange}</div></div>
+      <div class="stat-box"><div class="stat-label">Sector</div><div class="stat-value">${escapeHtml(meta.sector)}</div></div>
+    ` : `
+      <div class="stat-box"><div class="stat-label">${RANGE_LABEL[modalRange]} Start</div><div class="stat-value">${fmtPrice(startPrice)}</div></div>
+      <div class="stat-box"><div class="stat-label">Period High</div><div class="stat-value">${fmtPrice(Math.max(...series))}</div></div>
+      <div class="stat-box"><div class="stat-label">Period Low</div><div class="stat-value">${fmtPrice(Math.min(...series))}</div></div>
+      <div class="stat-box"><div class="stat-label">Change $</div><div class="stat-value ${dirClass}">${fmtChange(change)}</div></div>
+      <div class="stat-box"><div class="stat-label">Change %</div><div class="stat-value ${dirClass}">${fmtPct(pct)}</div></div>
+      <div class="stat-box"><div class="stat-label">Sector</div><div class="stat-value">${escapeHtml(meta.sector)}</div></div>
+    `;
+
+    modalContent.innerHTML = `
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">${symbol}</div>
+          <div class="modal-sub">${escapeHtml(meta.name)} · ${escapeHtml(meta.sector)}</div>
+        </div>
+        <button class="modal-close" id="modalClose">&times;</button>
+      </div>
+      <div class="modal-price-block">
+        <div class="modal-price">${fmtPrice(st.price)}</div>
+        <div class="modal-change ${dirClass}">${fmtChange(change)} (${fmtPct(pct)}) &middot; ${RANGE_LABEL[modalRange]}</div>
+      </div>
+      <div class="range-toggle modal-range" id="modalRangeToggle">
+        ${Object.keys(RANGE_LABEL).map(r => `<button data-range="${r}" class="${r === modalRange ? "active" : ""}">${r === "ALL" ? "All" : r}</button>`).join("")}
+      </div>
+      <canvas class="big-chart" id="bigChart"></canvas>
+      <div class="stats-grid">${statsHtml}</div>
+    `;
+    const bigCanvas = document.getElementById("bigChart");
+    drawSparkline(bigCanvas, series, pct >= 0);
+    document.getElementById("modalClose").addEventListener("click", closeModal);
+    document.getElementById("modalRangeToggle").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-range]");
+      if (!btn) return;
+      modalRange = btn.dataset.range;
+      renderModalBody(symbol);
+    });
+  }
+
+  function closeModal() {
+    modalOverlay.classList.remove("open");
+    modalOverlay.dataset.symbol = "";
+  }
+
+  modalOverlay.addEventListener("click", (e) => { if (e.target === modalOverlay) closeModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+
+  // ---------------------------------------------------------------
+  // Live tick loop
+  // ---------------------------------------------------------------
+  function tick() {
+    watchlist.forEach(sym => {
+      const st = priceState[sym];
+      if (!st || st.loading || st.failed) return;
+      const before = st.price;
+      tickSymbol(sym);
+      const after = st.price;
+      if (after > before) flashSet[sym] = "up";
+      else if (after < before) flashSet[sym] = "down";
+    });
+    renderAll();
+
+    if (modalOverlay.classList.contains("open") && modalOverlay.dataset.symbol) {
+      const sym = modalOverlay.dataset.symbol;
+      if (watchlist.includes(sym)) renderModalBody(sym);
+      else closeModal();
+    }
+  }
+
+  window.addEventListener("resize", renderAll);
+
+  checkExistingSession();
+})();
+</script>
+
+</body>
+</html>
