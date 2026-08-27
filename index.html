@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Harrison Manweiler</title>
+<style>
+  :root {
+    --bg: #0b2818;
+    --card-bg: rgba(255, 255, 255, 0.08);
+    --card-border: rgba(255, 255, 255, 0.2);
+    --text: #ffffff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { min-height: 100%; }
+
+  body {
+    font-family: "Times New Roman", Times, serif;
+    color: var(--text);
+    background-color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.25rem;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 760px;
+    text-align: center;
+  }
+
+  .name {
+    font-size: clamp(2.75rem, 8vw, 5rem);
+    font-weight: 700;
+    line-height: 1.05;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+  }
+
+  .tagline {
+    font-size: 1.1rem;
+    color: var(--text);
+    letter-spacing: 0.05em;
+    margin-bottom: 3rem;
+  }
+
+  .section-title {
+    font-size: clamp(1.4rem, 3.5vw, 1.9rem);
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: var(--text);
+  }
+
+  .loves {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 3.5rem;
+  }
+
+  .love-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    padding: 1.75rem 1rem;
+    transition: transform 0.25s ease, background 0.25s ease;
+  }
+
+  .love-card.clickable {
+    cursor: pointer;
+  }
+
+  .love-card:hover {
+    transform: translateY(-6px);
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .love-icon {
+    font-size: 2.25rem;
+    display: block;
+    margin-bottom: 0.6rem;
+  }
+
+  .love-label {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--text);
+  }
+
+  .love-card .default-view,
+  .love-card .love-list {
+    display: none;
+  }
+
+  .love-card:not(.expanded) .default-view {
+    display: block;
+  }
+
+  .love-card.expanded .love-list {
+    display: block;
+  }
+
+  .love-list {
+    list-style: none;
+    text-align: left;
+  }
+
+  .love-list li {
+    font-size: 0.95rem;
+    padding: 0.25rem 0;
+    color: var(--text);
+  }
+
+  blockquote {
+    position: relative;
+    font-size: clamp(1.15rem, 3vw, 1.5rem);
+    font-weight: 400;
+    font-style: italic;
+    line-height: 1.5;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    color: var(--text);
+  }
+
+  blockquote::before,
+  blockquote::after {
+    content: '"';
+    font-size: 2.5rem;
+    color: var(--text);
+    opacity: 0.7;
+    line-height: 0;
+    vertical-align: -0.3em;
+  }
+
+  cite {
+    display: block;
+    margin-top: 1rem;
+    font-style: normal;
+    font-size: 0.95rem;
+    color: var(--text);
+    letter-spacing: 0.03em;
+  }
+
+  @media (max-width: 560px) {
+    .loves {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1 class="name">Harrison Manweiler</h1>
+    <p class="tagline">Welcome to my corner of the internet</p>
+
+    <h2 class="section-title">Things I Love</h2>
+    <div class="loves">
+      <div class="love-card clickable" id="music-card" onclick="toggleCard('music-card')">
+        <div class="default-view">
+          <span class="love-icon">🎵</span>
+          <span class="love-label">Music</span>
+        </div>
+        <ul class="love-list">
+          <li>Radiohead</li>
+          <li>Coldplay</li>
+          <li>Metallica</li>
+          <li>David Kushner</li>
+          <li>Aerosmith</li>
+        </ul>
+      </div>
+      <div class="love-card clickable" id="books-card" onclick="toggleCard('books-card')">
+        <div class="default-view">
+          <span class="love-icon">📚</span>
+          <span class="love-label">Books</span>
+        </div>
+        <ul class="love-list">
+          <li>The Lord of the Rings</li>
+          <li>The Hobbit</li>
+          <li>Camp Valor</li>
+          <li>Redwall</li>
+          <li>Harry Potter</li>
+        </ul>
+      </div>
+      <div class="love-card">
+        <span class="love-icon">🎤</span>
+        <span class="love-label">Speech &amp; Debate</span>
+      </div>
+    </div>
+
+    <blockquote>
+      God doesn't call the qualified, He qualifies the called.
+      <cite>— Mark Batterson</cite>
+    </blockquote>
+  </div>
+
+  <script>
+    function toggleCard(id) {
+      var cards = document.querySelectorAll('.love-card.clickable');
+      cards.forEach(function (card) {
+        if (card.id === id) {
+          card.classList.toggle('expanded');
+        } else {
+          card.classList.remove('expanded');
+        }
+      });
+    }
+  </script>
+</body>
+</html>
